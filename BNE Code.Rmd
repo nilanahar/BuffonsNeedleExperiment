@@ -1,0 +1,289 @@
+---
+title: "STA 305 Progress Report - Technical"
+author: "Final Project - Group 19"
+date: "Due - Monday, August 16, 2021 at 11:59pm EDT"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+    number_sections: yes
+  word_document: default
+mainfont: Arial
+fontsize: 10pt
+header-includes:
+  \usepackage{fontspec}
+  \setmainfont{Arial}
+---
+
+```{r, echo= FALSE, include = FALSE}
+# Setup
+library(tidyverse)
+library(multcomp)
+library(readxl)
+```
+
+# Background
+Buffon’s Needle Experiment (1) was described in the 18th Century as a method to estimate *π*.  It is conducted by dropping a specfied number (n) of ‘needles’ (or ‘sticks’) of length *l* onto a surface with parallel lines separated by a distance of *t* (where *t > l*) and then counting the number (*c*) of needles that cross one of the lines.  This enables the probability *c/n* to be determined.  It has been shown that this probability is equal to *2l/tπ*, which, when rearranged, provides the estimate of *π* as *2ln/tc.*
+
+# Question of Interest
+The objective of the proposed experiment is to examine if the value of *n* or the ratio of *l:t* affects the estimation of the probability *c/n*, and hence *π*.
+
+# Variables
+* Number_of_Drops is one of the dependent factors, with two levels: 10 or 20 needles dropped per trial.
+* Needle_to_Width_Ratio is the length of needles used in a trial in relation to width of the parallel lines on the surface that the needles were dropped onto.  It is the second dependent factor, also with two levels: 0.9 or 0.5 (e.g., needles of length 1.5" being dropped onto a surface with parallel lines separated by 3.0").
+* Number_Crossed_Line is the number of needles crossing a parallel line on the landing surface, as determined by the group member conducting that trial.
+* Cross_Line_Proportion is the response variable calculated by dividing the Number_Crossed_Line variable by the Number_of_Drops.
+
+# Hypotheses
+The null hypothesis, *Ho*,  is that the four estimates of *c/n* will not differ with one another. 
+$$H_0: μ_{(.5,10)} = μ_{(.5,20)} = μ_{(.9,10)} = μ_{(.9,20)}$$
+The alternative hypothesis is that at least one of the four estimates of *c/n*, listed above, will differ from at least one of the others.
+
+# Design
+The experiment was carried out as a two-by-two factorial design.  For convenience, each of the members of our group volunteered to collect data for one of the *l:t* ratios (1:2 or 9:10) by conducting 25 iterations for each of *n* = 10 and *n* = 20 and recording for each trial how many needles/sticks crossed a line (i.e., *c*).  The data collected by the eight group was pooled to create the data set for analysis. 
+
+# Data & Pre-Processing
+
+A total of 400 trials were conducted, 50 by each of the eight members in our group. 
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+# Loading data
+setwd("~/Google Drive/5th Year/STA305")
+exp_data <- read_excel("dataset.xlsx")
+
+# cleaning data to remove unncessary N/A
+exp_data<- exp_data[, c(2, 3, 4, 5)]
+attach(exp_data)
+```
+
+
+# Analysis
+The primary data analysis will be a two-way analysis of variance.  A secondary analysis will be to estimate *π*.  These will be carried out using F tests with each *α* level being adjusted by Holm’s procedure (2).  An alpha level of 0.05 will be used.
+
+## Summary 
+```{r}
+summary(exp_data)
+```
+
+
+From the summary statistics, the mean proportion of needles crossing a line is 40.0%. 
+
+## Plots
+```{r}
+boxplot(Cross_Line_Proportion~Needle_to_Width_Ratio, data=exp_data, 
+        ylab="Effect of ratio on proportion", xlab="Needle to Width Ratio")
+```
+
+
+The proportion of needles found to cross a line differed when assessed by the needle-to-line width ratio: 29.4% for the length-to-width ratio of 0.5 and 51.0% for 0.9, as summarized in the box-plot above. 
+
+```{r}
+boxplot(Cross_Line_Proportion~Number_of_Drops, data=exp_data, 
+        ylab="Effect of ratio on proportion", xlab="Number of Drops")
+```
+
+
+A similar proportion of needles were found to cross a line when assessed by the number of needles dropped per trial: 39.1% for 10 needles and 41.4% for 20, as summarized in the box-plot above.
+
+```{r}
+boxplot(Cross_Line_Proportion~Number_of_Drops+Needle_to_Width_Ratio, 
+        data=exp_data, ylab="% of Needles Crossing Line", 
+        xlab="# of Drops - Needle to Width Ratio")
+```
+
+
+Consistent with first two boxplots, the above boxplot shows that the proportion of needles crossing a line is dependent on the needle length-to-line width ratio.
+
+```{r}
+with(exp_data,interaction.plot(Needle_to_Width_Ratio, Number_of_Drops, 
+                               Cross_Line_Proportion,col=c("red", "blue"), 
+                               main="Interaction Plot",
+                               xlab="Needle to Width Ratio", ylab="Cross Line
+                               Proportion"))
+```
+The interaction plot above suggests some degree of interaction between the two levels of “number of needles dropped” and the two levels of “needle length-to-line width ratio”. 
+
+## Model 
+
+A two-way ANOVA was conducted using the linear model with interaction.
+
+$$Y_{ijk} = μ_T + α_j + β_k + (αβ)_{jk} + ϵ_{ijk}$$
+```{r}
+model = lm(formula=Cross_Line_Proportion~Number_of_Drops*Needle_to_Width_Ratio)
+```
+
+## Assumptions
+
+### Independence 
+Each member of the group collected data separately, to pool a dataset together for analysis, which confirms each observation is independent from another.  
+
+### Linearity and Normality
+```{r}
+resid <- rstudent(model) 
+fitted <- predict(model)
+qqnorm(resid) 
+qqline(resid)
+```
+
+As seen above, most data points fall on the black diagonal line, can be seen increasing positively and concentrated in the middle, which confirms the assumption that error terms in the model are distributed randomly. 
+
+
+### Homoscedasticity
+```{r}
+plot(resid ~ exp_data$Number_of_Drops, type = "p", xlab = "Number of Drops", 
+     ylab = "Standardized Residual", cex.lab = 1.2, col = "red")
+
+lines(lowess(exp_data$Number_of_Drops, resid), col = "blue")
+```
+
+From the plot above, we can confirm the assumption of equal variances of error terms hold as the grouped points can be seen gathered together for all groups, meaning the groups differ only by their means, but have the same variance.
+
+
+## Two-Way Analysis of Variance
+
+A two-way analysis of variance was run to assess the effects the effects of the two independent variables, plus their interaction, on the response variable, proportion of needles crossing a line.  
+
+```{r}
+summary(model)
+```
+```{r}
+anova(model)
+```
+
+These results confirm that the ratio of the needle length to the width of the lines has the greatest effect on the proportion of needles found to cross a line (P < .001). Additionally, the interaction between number of needles dropped and the ratio of the needle length to the width of the lines also found to have  a statistically significant effect (P = .042). 
+
+## Secondary Analysis
+
+```{r}
+# seperating groups 
+group1=filter(exp_data,Number_of_Drops=='10',Needle_to_Width_Ratio=='0.5')
+group2=filter(exp_data,Number_of_Drops=='20',Needle_to_Width_Ratio=='0.5')
+group3=filter(exp_data,Number_of_Drops=='10',Needle_to_Width_Ratio=='0.9')
+group4=filter(exp_data,Number_of_Drops=='20',Needle_to_Width_Ratio=='0.9')
+```
+
+```{r, include=FALSE}
+# group means 
+mean1=group1 %>% summarize(mean=mean(Cross_Line_Proportion))
+mean2=group2 %>% summarize(mean=mean(Cross_Line_Proportion))
+mean3=group3 %>% summarize(mean=mean(Cross_Line_Proportion))
+mean4=group4 %>% summarize(mean=mean(Cross_Line_Proportion))
+means=matrix(c(mean1,mean2,mean3,mean4))
+
+# group variances
+var1=(group1 %>% summarize(sd=sd(Cross_Line_Proportion)))^2
+var2=(group2 %>% summarize(sd=sd(Cross_Line_Proportion)))^2
+var3=(group3 %>% summarize(sd=sd(Cross_Line_Proportion)))^2
+var4=(group4 %>% summarize(sd=sd(Cross_Line_Proportion)))^2
+variances=matrix(c(var1, var2, var3, var4))
+```
+
+While the analyses above address the primary question of this experiment, whether any of the dependent variables affect the proportion of needles crossing a line, they do not assess whether either of the independent variables affect the precision with which that proportion is measured.  As described above, to assess this the variances of the four  groups were compared by pair-wise F tests with each α level being adjusted by Holm’s procedure (2).  
+
+The mean of the four groups respectively were found to be:
+
+```{r}
+means
+```
+
+The variance of the four groups respectively were found to be:
+```{r}
+variances
+```
+
+```{r, include=FALSE}
+AlphaLevels <- matrix(c(1,6,0.0083,2,5,0.01,3,4,0.0125,4,3,
+                         0.0167,5,2,0.025,6,1,0.05),ncol=3,byrow=TRUE)
+colnames(AlphaLevels) <- c("Test #","Divisor","Result")
+AlphaLevels <- as.table(AlphaLevels)
+```
+
+Adjusted alpha levels using Holm's method (2)
+```{r}
+AlphaLevels
+```
+
+The most extreme pair of variances are for the two treatment groups with a ratio between the length of the needles and the width of lines equal to .9 (ie, 0.03657677 for 10 drops per trial and 0.01524520 for 20 drops). This F-ratio is equal to 2.4 with 99 degrees of freedom in the numerator and denominator, with a P-value < 0.001 so these two variances would be considered statistically significantly different.
+
+The next most extreme pair of variances are for the treatment group with a ratio between the length of the needles and the width of lines equal to .9 and 20 drops per trial (ie, 0.01524520) and the other group (ratio = 0.5) with 10 drops (ie, 0.02120808). This F-ratio is equal to 1.39, again with 99 degrees of freedom in the numerator and denominator, with a P-value = 0.05 so these two variances would not be considered statistically significantly different because the observed P-value of 0.05 is much greater than the Holm’s adjusted alpha level of 0.01.
+
+## 	Ability to estimate π
+
+The estimated means and variances for the four groups can be used to construct 95% confidence intervals as mean ± t.025, df=99 * SEM which gives the following:
+```{r, include=FALSE}
+# CI
+n <- 100
+
+a1 <- mean1
+s1 <- sqrt(var1)
+error1 <- qt(0.975,df=n-1)*s1/sqrt(n)
+left1 <- a1-error1
+right1 <- a1+error1
+
+CI1=t(matrix(c(left1,right1)))
+
+# group 2 CI
+a2 <- mean2
+s2 <- sqrt(var2)
+error2 <- qt(0.975,df=n-1)*s1/sqrt(n)
+left2 <- a2-error2
+right2 <- a2+error2
+
+CI2=t(matrix(c(left2,right2)))
+
+# group 3 CI
+a3 <- mean3
+s3 <- sqrt(var3)
+error3 <- qt(0.975,df=n-1)*s1/sqrt(n)
+left3 <- a3-error3
+right3 <- a3+error3
+
+CI3=t(matrix(c(left3,right3)))
+
+# group 4 CI
+a4 <- mean4
+s4 <- sqrt(var4)
+error4 <- qt(0.975,df=n-1)*s1/sqrt(n)
+left4 <- a4-error4
+right4 <- a4+error4
+
+CI4=t(matrix(c(left4,right4)))
+```
+
+Confidence intervals:
+
+
+Group 1
+```{r}
+CI1
+```
+
+Group 2
+```{r}
+CI2
+```
+
+Group 3
+```{r}
+CI3
+```
+
+Group 4
+```{r}
+CI4
+```
+
+As noted above, π can b e estimated through the equation: 2ln/tc, where l/t equals the length-to-width ratio and c/n equals 1/the estimated proportion as such the estimated values of π (i.e., π_hat) corresponding to the mean and 95% confidence limit values listed above would be:
+
+$$ \hatπ_1=3.53\to 3.20 $$
+$$ \hatπ_2=3.88 \to 3.58 $$
+$$ \hatπ_3=3.60 \to 3.30 $$
+$$ \hatπ_4=3.43 \to 3.28 $$
+
+# References 
+* Buffon’s Needle Experiment.  In: Rosenthal JS.  Struck by Lightning.  London, UK: Granta Publications, 2005: 187.
+* Holm S.  A simple sequentially rejective multiple test procedure.  Scand J Statistics 179; 6: 65-70.
+
+
+
+
+
